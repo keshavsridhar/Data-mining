@@ -1,2 +1,2 @@
 # Data-mining
-data mining
+Implementations of few data mining algorithms.
