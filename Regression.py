@@ -3,14 +3,14 @@ import pandas as pd
 import csv
 import xgboost as xgb
 # from xgboost.sklearn import XGBRegressor
-# import matplotlib.pyplot as plt
-# from scipy.stats import skew
+import matplotlib.pyplot as plt
+from scipy.stats import skew
 # from sklearn import cross_validation, metrics
 # from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import Lasso, LassoCV, Ridge, RidgeCV
-from random import randint as random_int
+# from random import randint as random_int
 
 
 def rmse(y_true, y_pred):
@@ -50,26 +50,42 @@ def makedummies(df):
     tempdf = getdummyvars(tempdf, df, "LandSlope", None)
     tempdf = getdummyvars(tempdf, df, "Electrical", "SBrkr")
     tempdf = getdummyvars(tempdf, df, "GarageType", "None")
+    tempdf = getdummyvars(tempdf, df, "GarageQual", "None")
+    tempdf = getdummyvars(tempdf, df, "GarageCond", "None")
+    tempdf = getdummyvars(tempdf, df, "PoolQC", "None")
     tempdf = getdummyvars(tempdf, df, "PavedDrive", None)
     tempdf = getdummyvars(tempdf, df, "MiscFeature", "None")
+    tempdf = getdummyvars(tempdf, df, "Fence", "None")
+    tempdf = getdummyvars(tempdf, df, "MoSold", None)
+    tempdf = getdummyvars(tempdf, df, "GarageFinish", "None")
+    tempdf = getdummyvars(tempdf, df, "BsmtExposure", "None")
+    tempdf = getdummyvars(tempdf, df, "BsmtFinType1", "None")
+    tempdf = getdummyvars(tempdf, df, "BsmtFinType2", "None")
+    tempdf = getdummyvars(tempdf, df, "Functional", "None")
+    tempdf = getdummyvars(tempdf, df, "ExterQual", "None")
+    tempdf = getdummyvars(tempdf, df, "ExterCond", "None")
+    tempdf = getdummyvars(tempdf, df, "BsmtQual", "None")
+    tempdf = getdummyvars(tempdf, df, "BsmtCond", "None")
     # By including street and alley encodings:
     # XGBoost score on training set:  0.048088620072
     # Lasso score on training set: 0.101160413666
     tempdf = getdummyvars(tempdf, df, "Street", None)
     tempdf = getdummyvars(tempdf, df, "Alley", None)
-
+    # tempdf = getdummyvars(tempdf, df, "GarageYrBlt", None)
+    # tempdf = getdummyvars(tempdf, df, "YearBuilt", None)
     idx = (df["MasVnrArea"] != 0) & ((df["MasVnrType"] == "None") | (df["MasVnrType"].isnull()))
     tempdf.loc[idx, "MasVnrType"] = "BrkFace"
     tempdf = getdummyvars(tempdf, df, "MasVnrType", "None")
     return tempdf
 
 
-def factorize(df, column, fill_na=None):
+def factorize(tdf, df, column, fill_na=None):
     le = LabelEncoder()
+    df[column] = tdf[column]
     if fill_na is not None:
         df[column].fillna(fill_na, inplace=True)
-    else:
-        df[column].fillna("None", inplace=True)
+    # else:
+    #    df[column].fillna("None", inplace=True)
     le.fit(df[column].unique())
     df[column] = le.transform(df[column])
     return df
@@ -82,7 +98,7 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
     for key, group in lotfn:
         idx = (df["Neighborhood"] == key) & (df["LotFrontage"].isnull())
         processed_df.loc[idx, "LotFrontage"] = group.median()
-
+    '''
     for index in range(len(df)):
         if df.ix[index]["MasVnrType"] == 'CBlock':
             processed_df.set_value(index, 'MasVnrScalPrice', df.ix[index]['MasVnrArea'])
@@ -94,23 +110,19 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
             processed_df.set_value(index, 'MasVnrScalPrice', df.ix[index]['MasVnrArea']*2)
         else:
             processed_df.set_value(index, 'MasVnrScalPrice', 0)
+    '''
 
-    processed_df["Age"] = df["YrSold"] - df["YearBuilt"]
+    processed_df["YrSold"] = df["YrSold"]
+    # processed_df["Agesincebuilttosold"] = df["YrSold"] - df["YearBuilt"]
+    processed_df["Agesincesold"] = 2010 - df["YrSold"]
+    processed_df["Age"] = 2010 - df["YearBuilt"]
     processed_df['LotArea'] = df['LotArea']
     processed_df["MoSold"] = df["MoSold"]
-    processed_df["YrSold"] = df["YrSold"]
-    processed_df["LandContour"] = (df["LandContour"] == "Lvl") * 1
-    processed_df["Electrical"] = (df["Electrical"] == "SBrkr") * 1
-    processed_df["LandSlope"] = (df["LandSlope"] == "Gtl") * 1
-    processed_df["MiscFeature"] = (df["MiscFeature"] == "Shed") * 1
-    processed_df["Has_Alley"] = df.Alley.replace(
-            {'Grvl': 1, 'Pave': 1, 'Street': 1, 'NA': 0})
+    processed_df["Has_Alley"] = df.Alley.replace({'Grvl': 1, 'Pave': 1, 'Street': 1, 'NA': 0})
     processed_df["NeighborhoodIndicator"] = df["Neighborhood"].map(neighborhood_map)
     processed_df["BldgTypeIndicator"] = df["BldgType"].map(bldg_type_map)
-    processed_df["HouseStyle"] = df["HouseStyle"]
-    processed_df["Condition1"] = df["Condition1"]
-    processed_df = factorize(processed_df, "HouseStyle")
-    processed_df = factorize(processed_df, "Condition1")
+    processed_df = factorize(df, processed_df, "HouseStyle")
+    processed_df = factorize(df, processed_df, "Condition1")
 
     processed_df["TotalBsmtSF"] = df["TotalBsmtSF"]
     processed_df["GrLivArea"] = df["GrLivArea"]
@@ -118,17 +130,16 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
     processed_df["GarageArea"] = df["GarageArea"]
     processed_df["GarageArea"].fillna(0, inplace=True)
 
-    processed_df["WoodDeckSF"] = (df["WoodDeckSF"] != 0) * 1
-    processed_df["OpenPorchSF"] = (df["OpenPorchSF"] != 0) * 1
-    processed_df["EnclosedPorch"] = (df["EnclosedPorch"] != 0) * 1
-    processed_df["3SsnPorch"] = (df["3SsnPorch"] != 0) * 1
-    processed_df["ScreenPorch"] = (df["ScreenPorch"] != 0) * 1.0
+    processed_df["WoodDeckSF"] = df["WoodDeckSF"]
+    processed_df["OpenPorchSF"] = df["OpenPorchSF"]
+    processed_df["EnclosedPorch"] = df["EnclosedPorch"]
+    processed_df["3SsnPorch"] = df["3SsnPorch"]
+    processed_df["ScreenPorch"] = df["ScreenPorch"]
 
     processed_df["PoolArea"] = df["PoolArea"]
     processed_df["MiscVal"] = df["MiscVal"]
 
-    processed_df["MSZoning"] = df["MSZoning"]
-    processed_df = factorize(processed_df, "MSZoning", "RL")
+    processed_df = factorize(df, processed_df, "MSZoning", "RL")
     processed_df["NewHome"] = df["MSSubClass"].replace({20: 1, 30: 0, 40: 0, 45: 0,50: 0, 60: 1, 70: 0, 75: 0, 80: 0, 85: 0,
                                                         90: 0, 120: 1, 150: 0, 160: 0, 180: 0, 190: 0})
 
@@ -192,10 +203,10 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
                  'TotalBsmtSF', '1stFlrSF', '2ndFlrSF', 'GrLivArea', 'GarageArea', 'WoodDeckSF',
                  'OpenPorchSF', 'EnclosedPorch', '3SsnPorch', 'ScreenPorch', 'LowQualFinSF', 'PoolArea']
     processed_df["*TotalArea"] = df[area_cols].sum(axis=1)
-    processed_df["*MainArea"] = df["GrLivArea"] + df["TotalBsmtSF"]
+    # processed_df["*MainArea"] = df["GrLivArea"] + df["TotalBsmtSF"]
     processed_df["*FloorArea"] = df["1stFlrSF"] + df["2ndFlrSF"]
-    processed_df["*TotBathrooms"] = df["BsmtFullBath"] + (0.5 * df["BsmtHalfBath"]) + df["FullBath"] + (
-                                       0.5 * df["HalfBath"])
+    processed_df["*TotBathrooms"] = df["BsmtFullBath"] + (df["BsmtHalfBath"]) + df["FullBath"] + (
+                                       df["HalfBath"])
 
     processed_df["OverallQual"] = df["OverallQual"]
     processed_df["OverallCond"] = df["OverallCond"]
@@ -228,13 +239,13 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
     processed_df.loc[df.Neighborhood == 'NoRidge', "Neighborhood_Good"] = 1
     processed_df["Neighborhood_Good"].fillna(0, inplace=True)
 
-    processed_df["SaleCondition_PriceDown"] = df.SaleCondition.replace(
+    processed_df["SaleCondition_PD"] = df.SaleCondition.replace(
         {'Abnorml': 1, 'Alloca': 1, 'AdjLand': 1, 'Family': 1, 'Normal': 0, 'Partial': 0})
     processed_df["BadHeating"] = df.HeatingQC.replace(
         {'Ex': 0, 'Gd': 0, 'TA': 0, 'Fa': 1, 'Po': 1})
     processed_df["GarageYrBlt"] = df["GarageYrBlt"]
     processed_df["GarageYrBlt"].fillna(0.0, inplace=True)
-
+    '''
     # Taking polynomials of top 10 features got from corr.py as new features:
     # x2:
     processed_df["OverallQual2"] = processed_df["OverallQual"]**2
@@ -271,24 +282,17 @@ def process_data(df, neighborhood_map, bldg_type_map, zone_type_map, qual_map):
     processed_df["root_*TotBathrooms"] = np.sqrt(processed_df["*TotBathrooms"])
     processed_df["root_KitchenQual"] = np.sqrt(processed_df["KitchenQual"])
     processed_df["root_GarageArea"] = np.sqrt(processed_df["GarageArea"])
+    '''
 
     # new2
-    processed_df["LotConfig"] = df["LotConfig"]
-    processed_df = factorize(processed_df, "LotConfig")
-    processed_df["Neighborhood"] = df["Neighborhood"]
-    processed_df = factorize(processed_df,  "Neighborhood")
-    processed_df["RoofStyle"] = df["RoofStyle"]
-    processed_df = factorize(processed_df, "RoofStyle")
-    processed_df["Exterior1st"] = df["Exterior1st"]
-    processed_df = factorize(processed_df, "Exterior1st")
-    processed_df["Exterior2nd"] = df["Exterior2nd"]
-    processed_df = factorize(processed_df, "Exterior2nd")
-    processed_df["MasVnrType"] = df["MasVnrType"]
-    processed_df = factorize(processed_df, "MasVnrType")
-    processed_df["Foundation"] = df["Foundation"]
-    processed_df = factorize(processed_df, "Foundation")
-    processed_df["SaleType"] = df["SaleType"]
-    processed_df = factorize(processed_df, "SaleType")
+    processed_df = factorize(df, processed_df, "LotConfig")
+    processed_df = factorize(df, processed_df,  "Neighborhood")
+    processed_df = factorize(df, processed_df, "RoofStyle")
+    processed_df = factorize(df, processed_df, "Exterior1st", "Oth1")
+    processed_df = factorize(df, processed_df, "Exterior2nd", "Oth1")
+    processed_df = factorize(df, processed_df, "MasVnrType", "None")
+    processed_df = factorize(df, processed_df, "Foundation")
+    processed_df = factorize(df, processed_df, "SaleType", "Random")
 
     processed_df["IsRegularLotShape"] = (df["LotShape"] == "Reg") * 1
     processed_df["IsLandLevel"] = (df["LandContour"] == "Lvl") * 1
@@ -352,7 +356,7 @@ def xgbr(train, trainlabel, test):
             colsample_bytree=0.2,
             gamma=0.0,
             learning_rate=0.01,
-            max_depth=4,
+            max_depth=5,
             min_child_weight=1.5,
             n_estimators=10000,
             reg_alpha=0.5,
@@ -380,7 +384,7 @@ def xgbr(train, trainlabel, test):
     y_test = train_price_df
 
     y_pred_t = regr.predict(proc_test_df)
-    y_pred_t = np.exp(y_pred_t)
+    # y_pred_t = np.exp(y_pred_t)
     print("XGBoost score on training set: ", rmse(y_test, y_pred))
     return y_pred_t
 '''
@@ -394,11 +398,11 @@ def xgbr(train, trainlabel, test):
     regr = xgb.XGBRegressor(
         colsample_bytree=0.2,
         gamma=0.0,
-        learning_rate=0.01,
-        max_depth=4,
+        learning_rate=0.05,
+        max_depth=5,
         min_child_weight=1.5,
-        n_estimators=10000,
-        reg_alpha=0.5,
+        n_estimators=7200,
+        reg_alpha=0.7,
         reg_lambda=0.6,
         subsample=0.2,
         seed=42,
@@ -410,6 +414,7 @@ def xgbr(train, trainlabel, test):
     # y_pred_t = np.exp(y_pred_t)
     print("XGBoost score on training set: ", rmse(y_pred, y_test))
     return y_pred_t
+
 
 '''
 # XGB with CV:
@@ -434,10 +439,10 @@ xgb1 = XGBRegressor(max_depth=5, learning_rate=0.1, n_estimators=8000, silent=Tr
 modelfit(xgb1, proc_train_df, train_price_df)
 '''
 
-
+'''
 def lassor(train, trainlabel, test):
     # Lasso:
-    best_alpha = 0.00009
+    best_alpha = 0.00099
     # best_alpha = 0.0007
     proc_train_df = train
     train_price_df = trainlabel
@@ -474,30 +479,65 @@ def lassor(train, trainlabel, test):
     ly_pred = ly_pred/len(l_bag_of_preds)
     ly_pred_t = ly_pred_t/len(l_bag_of_preds)
     ly_test = train_price_df
+    # print(regr.coef_)
+    coefs = None
+    for reg in l_bag_of_preds:
+        if coefs is None:
+            coefs = reg.coef_
+        else:
+            coefs = coefs + reg.coef_
+        # print(coefs)
     print("Lasso score on training set: " + str(rmse(ly_test, ly_pred)))
+    coefs = coefs/len(l_bag_of_preds)
+    # print(coefs)
+    coefs = np.reshape(coefs, len(coefs.transpose()))
+    coefs = pd.Series(coefs, index=proc_train_df.columns)
+    # print(coefs.describe)
+    pltcoefs = pd.concat([coefs.sort_values().head(10), coefs.sort_values().tail(10)])
+    print(pltcoefs)
+    pltcoefs.plot(kind="barh")
+    plt.title("Coefficients in the lasso model:")
+    plt.show()
     # ly_pred_t = np.exp(ly_pred_t)
     return ly_pred_t
+'''
 
-'''
+
 # Lasso with CV to find the best alpha:
-lasso = LassoCV(alphas=[0.0001, 0.0003, 0.0006, 0.001, 0.003, 0.006, 0.01, 0.03, 0.06,
-                        0.1, 0.3, 0.6, 1], max_iter=50000, cv=10)
-lasso.fit(proc_train_df, train_price_df)
-alpha = lasso.alpha_
-print("Best alpha: ", alpha)
-print("Centering for more precision around alpha: ", alpha)
-lasso = LassoCV(alphas=[alpha * 0.6, alpha * 0.65, alpha * 0.7, alpha * 0.75, alpha * 0.8, alpha * 0.85,
-                        alpha * 0.9, alpha * 0.95, alpha, alpha * 1.05, alpha * 1.10, alpha * 1.15,
-                        alpha * 1.25, alpha * 1.3, alpha * 1.35, alpha * 1.4], max_iter=50000, cv=10)
-lasso = lasso.fit(proc_train_df, train_price_df)
-alpha = lasso.alpha_
-print("Best alpha: ", alpha)
-ly_test = train_price_df
-ly_pred = lasso.predict(proc_train_df)
-ly_pred_t = lasso.predict(proc_test_df)
-print("Lasso score on training set: " + str(rmse(ly_test, ly_pred)))
-ly_pred_t = np.exp(ly_pred_t)
-'''
+def lassor(train, trainlabel, test):
+    proc_train_df = np.array(train)
+    train_price_df = np.array(trainlabel)
+    # print(train_price_df.shape)
+    train_price_df = np.reshape(train_price_df, len(train_price_df))
+    # train_price_df = np.reshape(train_price_df, len(train_price_df))
+    proc_test_df = np.array(test)
+
+    lasso = LassoCV(alphas=[0.0001, 0.0003, 0.0006, 0.001, 0.003, 0.006, 0.01, 0.03, 0.06,
+                            0.1, 0.3, 0.6, 1], max_iter=50000, cv=10)
+
+    lasso.fit(proc_train_df, train_price_df)
+    alpha = lasso.alpha_
+    print("Best alpha: ", alpha)
+    print("Centering for more precision around alpha: ", alpha)
+    lasso = LassoCV(alphas=[alpha * 0.6, alpha * 0.65, alpha * 0.7, alpha * 0.75, alpha * 0.8, alpha * 0.85,
+                            alpha * 0.9, alpha * 0.95, alpha, alpha * 1.05, alpha * 1.10, alpha * 1.15,
+                            alpha * 1.25, alpha * 1.3, alpha * 1.35, alpha * 1.4], max_iter=50000, cv=10)
+    lasso = lasso.fit(proc_train_df, train_price_df)
+    alpha = lasso.alpha_
+    print("Best alpha: ", alpha)
+    ly_test = train_price_df
+    ly_pred = lasso.predict(proc_train_df)
+    ly_pred_t = lasso.predict(proc_test_df)
+    print("Lasso score on training set: " + str(rmse(ly_test, ly_pred)))
+    coefs = np.reshape(lasso.coef_, len(lasso.coef_.transpose()))
+    coefs = pd.Series(coefs, index=train.columns)
+    pltcoefs = pd.concat([coefs.sort_values().head(10), coefs.sort_values().tail(10)])
+    print(pltcoefs)
+    pltcoefs.plot(kind="barh")
+    plt.title("Coefficients for the lasso model:")
+    plt.show()
+    # ly_pred_t = np.exp(ly_pred_t)
+    return ly_pred_t
 
 '''
 #  Ridge:
@@ -563,25 +603,21 @@ def ridger(train, trainlabel, test):
     coefs = pd.Series(coefs, index=proc_train_df.columns)
     print("Ridge regularization picked: " + str(sum(coefs != 0)) + " and eliminated:" + str(sum(coefs == 0)) + " features")
     # print(coefs)
-
     rvalid = np.array(rclf.predict(proc_train_df))
     # rvalid = np.exp(rvalid)
     rtest = np.array(rclf.predict(proc_test_df))
     # rtest = np.exp(rtest)
-    '''
+    print("Ridge score on training set: " + str(rmse(train_price_df, rvalid)))
     pltcoefs = pd.concat([coefs.sort_values().head(10), coefs.sort_values().tail(10)])
+    print(pltcoefs)
     pltcoefs.plot(kind="barh")
     plt.title("Coefficients in the Ridge model:")
     plt.show()
-    r_pred = np.array(rclf.predict(proc_train_df))
-    r_pred_t = np.array(rclf.predict(proc_test_df))
-    print("Ridge score on training set: " + str(rmse(train_price_df, r_pred)))
-    r_pred_t = np.exp(r_pred_t)
-    print(type(y_pred_t))
-    print(type(r_pred_t))
-    print(r_pred_t[0])
-    '''
-    print("Ridge score on training set: " + str(rmse(train_price_df, rvalid)))
+    # r_pred_t = np.exp(r_pred_t)
+    # print(type(r_pred_t))
+    # print(type(r_pred_t))
+    # print(r_pred_t[0])
+
     return rtest
 
 
@@ -605,25 +641,25 @@ if __name__ == "__main__":
         "OldTown": 1,  # 119000
         "Edwards": 1,  # 119500
         "BrkSide": 1,  # 124300
-        "Sawyer": 2,  # 135000
-        "Blueste": 2,  # 137500
+        "Sawyer": 1,  # 135000
+        "Blueste": 1,  # 137500
         "SWISU": 2,  # 139500
         "NAmes": 2,  # 140000
         "NPkVill": 2,  # 146000
         "Mitchel": 2,  # 153500
-        "SawyerW": 3,  # 179900
-        "Gilbert": 3,  # 181000
-        "NWAmes": 3,  # 182900
-        "Blmngtn": 3,  # 191000
-        "CollgCr": 3,  # 197200
+        "SawyerW": 2,  # 179900
+        "Gilbert": 2,  # 181000
+        "NWAmes": 2,  # 182900
+        "Blmngtn": 2,  # 191000
+        "CollgCr": 2,  # 197200
         "ClearCr": 3,  # 200250
         "Crawfor": 3,  # 200624
-        "Veenker": 4,  # 218000
-        "Somerst": 4,  # 225500
-        "Timber": 4,  # 228475
-        "StoneBr": 5,  # 278000
-        "NoRidge": 5,  # 290000
-        "NridgHt": 5,  # 315000
+        "Veenker": 3,  # 218000
+        "Somerst": 3,  # 225500
+        "Timber": 3,  # 228475
+        "StoneBr": 4,  # 278000
+        "NoRidge": 4,  # 290000
+        "NridgHt": 4,  # 315000
     }
 
     bldg_type_map = {
@@ -657,6 +693,14 @@ if __name__ == "__main__":
     train_price_df = train_price_df.drop([523, 691, 1182, 1298])
     numfeats = proc_train_df.dtypes[proc_train_df.dtypes != "object"].index
 
+    # Check on it later
+    # skew
+    skewed = proc_train_df[numfeats].apply(lambda x: skew(x.dropna().astype(float)))
+    skewed = skewed[skewed > 0.75]
+    skewed = skewed.index
+    proc_train_df[skewed] = np.log1p(proc_train_df[skewed])
+    proc_test_df[skewed] = np.log1p(proc_test_df[skewed])
+
     # Scaling the numerical features:
     scaler = StandardScaler()
     scaler.fit(proc_train_df[numfeats])
@@ -668,17 +712,7 @@ if __name__ == "__main__":
     for i, col in enumerate(numfeats):
         proc_test_df[col] = scaled[:, i]
     # print(proc_test_df.head(5))
-
-    '''
-    # Check on it later
-    # skew
-    skewed = proc_train_df[numfeats].apply(lambda x: skew(x.dropna().astype(float)))
-    skewed = skewed[skewed > 0.75]
-    skewed = skewed.index
-    proc_train_df[skewed] = np.log1p(proc_train_df[skewed])
-    proc_test_df[skewed] = np.log1p(proc_test_df[skewed])
-    '''
-
+    # print(sum(proc_train_df["LotFrontage"])/len(proc_train_df["LotFrontage"]))
     # Dropping few outliers
     train_df = train_df.drop([523, 691, 1182, 1298])
 
@@ -699,12 +733,13 @@ if __name__ == "__main__":
         "_Condition2_RRAe", "_Condition2_RRAn", "_Condition2_RRNn",
         "_Heating_Floor", "_Heating_OthW",
         "_Electrical_Mix",
-        "_MiscFeature_TenC"
+        "_MiscFeature_TenC",
+        "_GarageQual_Ex", "_PoolQC_Fa"
     ]
     proc_train_df.drop(drop_cols, axis=1, inplace=True)
 
-    # Following column is missing in train data so dropping it
-    proc_test_df.drop(["_MSSubClass_150"], axis=1, inplace=True)
+    # Following columns are missing in train data so dropping it
+    proc_test_df.drop(["_MSSubClass_150", "_Functional_None"], axis=1, inplace=True)
 
     drop_cols2 = [
         # only two are not zero
@@ -714,16 +749,18 @@ if __name__ == "__main__":
     ]
     proc_train_df.drop(drop_cols2, axis=1, inplace=True)
     proc_test_df.drop(drop_cols2, axis=1, inplace=True)
-
-    xgb_pred = xgbr(proc_train_df, train_price_df, proc_test_df)
-    lasso_pred = lassor(proc_train_df, train_price_df, proc_test_df)
+    # Uncomment the following to run chosen model
+    # xgb_pred = xgbr(proc_train_df, train_price_df, proc_test_df)
+    # lasso_pred = lassor(proc_train_df, train_price_df, proc_test_df)
     # ridge_pred = ridger(proc_train_df, train_price_df, proc_test_df)
-
+'''
     for i in range(len(xgb_pred)):
         print(np.exp((xgb_pred[i] + lasso_pred[i])/2))
 
-    with open("XLmodularv2.csv", "w", newline='') as f:
+    with open("XL_tunednewv6.csv", "w", newline='') as f:
         w1 = csv.writer(f)
         w1.writerow(["Id", "SalePrice"])
         for i in range(len(xgb_pred)):
+            # w1.writerow([str(test_df["Id"][i]), str(np.exp((xgb_pred[i] + lasso_pred[i])/2))])
             w1.writerow([str(test_df["Id"][i]), str(np.exp((xgb_pred[i] + lasso_pred[i])/2))])
+'''
